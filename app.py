@@ -16,10 +16,16 @@ from utils.feedback.analyze import update_conversation_history, analyze_history,
 from secrets_manager import API_KEY, PROD_CHANNEL_ID, PROD_CHANNEL_ID2, ITSM_KEY, ITSM_CHANNEL_ID
 import requests
 import random
+from nemoguardrails import LLMRails, RailsConfig
+import asyncio
 
 load_dotenv()
 # Initialize Flask app
 app = Flask(__name__)
+
+# Load NeMo Guardrails configuration
+config = RailsConfig.from_path("./config")
+rails = LLMRails(config)
 
 # Set up logging
 logger = logging.getLogger(__name__)
@@ -191,7 +197,17 @@ def process_query_helper(conv_id, query):
     
     # Call LLM to get the final response
     logger.info("Calling LLM to generate the response.")
-    response = call_llm_sonet(client, prompt)
+    # response = call_llm_sonet(client, prompt)
+    # NeMo generate is async; use an event loop or async/await
+    # For a standard Flask app, you can use a helper or run_sync
+    response_text = rails.generate(messages=[{
+        "role": "user", 
+        "content": prompt
+    }])
+        
+    # Guardrails returns a string or a dict depending on config
+    response = response_text['content'] if isinstance(response_text, dict) else response_text
+    
     if not response:
         logger.error("Failed to generate a response from LLM.")
         return error_response(500, "Failed to get a response from LLM.")
@@ -307,7 +323,7 @@ def summary_helper(conv_id, query):
     
 
 @app.route('/process_query', methods=['POST', 'OPTIONS'])
-def process_query():
+async def process_query():
     logger.info("Flask handler started.")
     try:
         # Check for the API key in the request headers
@@ -364,7 +380,7 @@ def process_query():
 
         else:
             logger.info("Processing query helper...")
-            query_helper_response = process_query_helper(conv_id, query)
+            query_helper_response = await process_query_helper(conv_id, query)
             return query_helper_response
 
 
