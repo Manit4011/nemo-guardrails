@@ -132,7 +132,7 @@ def analyze_sentiment_route():
         return jsonify({'status': 'error', 'message': str(e)}), 500
 
 
-def process_query_helper(conv_id, query):
+async def process_query_helper(conv_id, query):
     # Retrieve past queries
     logger.info("Retrieving past queries from DocumentDB.")
     past_queries, msg_id = get_past_queries(conv_id, k=4)
@@ -200,13 +200,13 @@ def process_query_helper(conv_id, query):
     # response = call_llm_sonet(client, prompt)
     # NeMo generate is async; use an event loop or async/await
     # For a standard Flask app, you can use a helper or run_sync
-    response_text = rails.generate(messages=[{
+    response_text = await rails.generate(messages=[{
         "role": "user", 
         "content": prompt
     }])
         
     # Guardrails returns a string or a dict depending on config
-    response = response_text['content'] if isinstance(response_text, dict) else response_text
+    response = response_text['content'] if isinstance(response_text, dict) else getattr(response_text, 'content', response_text)
     
     if not response:
         logger.error("Failed to generate a response from LLM.")
