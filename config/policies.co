@@ -11,7 +11,7 @@ define user ask about policies
 define bot intent_allowed
   "ALLOWED"
 
-# Updated Flow: Ensure it triggers the bot response
+# Use the 'when' syntax to ensure the flow triggers and returns the bot message
 define flow allow policy queries
   user ask about policies
   bot intent_allowed

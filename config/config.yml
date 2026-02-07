@@ -10,7 +10,7 @@ models:
 rails:
   input:
     flows:
-      - allow policy queries      # Check for valid queries first
+      - allow policy queries
       - check jailbreak
       - check sensitive topics
   output:

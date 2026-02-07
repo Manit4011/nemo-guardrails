@@ -146,22 +146,25 @@ async def process_query_helper(conv_id, query):
     
     # Extract the response string from the Guardrails output.
     initial_response = initial_guardrail_check['content'] if isinstance(initial_guardrail_check, dict) else getattr(initial_guardrail_check, 'content', initial_guardrail_check)
+    initial_response = initial_response.strip()
 
-    print(f"DEBUG: Initial Guardrail Response: '{initial_response}'") # Check this in your terminal
+    print(f"DEBUG: Initial Guardrail Response: '{initial_response}'") 
     
     # Exact refusal message defined in your disallowed.co file.
     refusal_message = "I am an AI assistant for Gemini Solutions HR policies. I cannot answer questions regarding sensitive, personal, or illegal topics."
 
     # DETERMINISTIC CHECK:
     # If the response is exactly our allowed token, we bypass the block.
-    if initial_response == "ALLOWED":
+    if initial_response == "ALLOWED" or initial_response == "":
         logger.info("Guardrail passed via explicit allow-list.")
 
-    elif not initial_response.strip() or "sensitive, personal, or illegal topics" in initial_response.strip():
+    # Block only if the response explicitly contains the refusal message 
+    # OR if it's empty AND we didn't get an 'ALLOWED' token (standard fallback).
+    elif refusal_message in initial_response:
         logger.info(f"Guardrail triggered for query: {query}")
         
-        # Use the standard refusal message if the guardrail returned an empty string
-        final_answer = initial_response.strip() if initial_response.strip() else refusal_message
+        # Use the standard refusal message
+        final_answer = initial_response if initial_response else refusal_message
         
         parsed_refusal = {
             "Answer": final_answer,
@@ -229,7 +232,7 @@ async def process_query_helper(conv_id, query):
     # Generate the RAG prompt.
     prompt = get_prompt(rewritten_query, similar_docs, conv_id)
     
-    # Call LLM through Rails to generate the final response with output filtering.
+    # Call LLM through Bedrock for final response.
     logger.info("Calling LLM directly via Bedrock for final response.")
     response = call_llm_sonet(client, prompt)
     
@@ -262,7 +265,6 @@ async def process_query_helper(conv_id, query):
 
     logger.info("Process completed successfully.")
     return jsonify({'statusCode': 200, 'body': {'response': parsed_response}})
-
 
 
 def summary_helper(conv_id, query):
