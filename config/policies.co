@@ -1,0 +1,17 @@
+# In config/policies.co
+define user ask about policies
+  "What is the sick leave policy?"
+  "How many vacation days do I get?"
+  "Tell me about medical insurance"
+  "What are the maternity leave benefits?"
+  "Can I work from home?"
+  "policy"
+  "leave"
+
+define bot intent_allowed
+  "ALLOWED"
+
+# Updated Flow: Ensure it triggers the bot response
+define flow allow policy queries
+  user ask about policies
+  bot intent_allowed
