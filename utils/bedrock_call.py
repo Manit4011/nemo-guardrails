@@ -14,15 +14,16 @@ load_dotenv()
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
 
-# Initialising boto clients
-# client = boto3.client(service_name='bedrock-runtime', region_name="us-west-2")
-# embed_client = boto3.client(service_name='bedrock-runtime', region_name="us-west-2")
+# Centralize configuration
+BEDROCK_REGION = os.getenv("REGION_NAME_1", "us-west-2")
+GUARDRAIL_VERSION = os.getenv("GUARDRAIL_VERSION", "3")
 
 # Function to reinitialize boto clients
-def reinitialize_client(region_name):
-    logger.info(f"Re-initializing bedrock-runtime client in '{region_name}' region.")
+def reinitialize_client(region_name=None):
+    region = region_name or BEDROCK_REGION
+    logger.info(f"Re-initializing bedrock-runtime client in '{region}' region.")
     config = Config(connect_timeout=60, read_timeout=60, retries={'max_attempts': 2, 'mode': 'standard'})
-    client = boto3.client(service_name='bedrock-runtime', region_name=region_name, config=config)
+    client = boto3.client(service_name='bedrock-runtime', region_name=region, config=config)
     logger.info("Client reinitialized successfully.")
     return client
 
@@ -68,7 +69,7 @@ def call_llm_sonet(client, prompt: str, guardrail: str = prompt_guardrail_arn,
             if guardrail:
                 logger.info("Guardrail on Model Call")
                 invoke_params["guardrailIdentifier"] = guardrail
-                invoke_params["guardrailVersion"] = "3"
+                invoke_params["guardrailVersion"] = GUARDRAIL_VERSION
             response = client.invoke_model(**invoke_params)
             model_response = json.loads(response["body"].read())
             if not model_response:
@@ -83,7 +84,8 @@ def call_llm_sonet(client, prompt: str, guardrail: str = prompt_guardrail_arn,
             logger.error(f"Error during LLM call. Reason: {e}")
             if isinstance(e, ClientError) and e.response['Error']['Code'] == 'ExpiredToken':
                 logger.error("Token expired during LLM call. Reinitializing client...")
-                client = reinitialize_client("us-west-2")
+                # Updated to use the variable instead of hardcoded region
+                client = reinitialize_client(BEDROCK_REGION)
             else:
                 if attempt < max_retries:
                     logger.info(f"Retrying in {retry_delay} seconds... (Attempt {attempt + 1} of {max_retries})")
@@ -154,7 +156,8 @@ def call_llama(client, prompt, model='meta.llama3-1-70b-instruct-v1:0', max_toke
     ]
 
     try:
-        client = boto3.client(service_name='bedrock-runtime', region_name="us-west-2")
+        # Updated to use the variable instead of hardcoded region
+        client = boto3.client(service_name='bedrock-runtime', region_name=BEDROCK_REGION)
         response = client.converse(
             modelId=model,
             messages=conversation,
@@ -427,6 +430,7 @@ def create_embeddings(embed_client, text, model='amazon.titan-embed-text-v2:0', 
             logger.error(f"Error during embedding call. Reason: {e}")
             if isinstance(e, ClientError) and e.response['Error']['Code'] == 'ExpiredToken':
                 logger.error("Token expired during embedding call. Reinitializing client...")
+                # Updated to use the variable instead of hardcoded region
                 embed_client = reinitialize_client(embed_client.meta.region_name)
             else:
                 if attempt < max_retries:

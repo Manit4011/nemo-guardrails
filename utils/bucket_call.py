@@ -103,4 +103,4 @@ def extract_file_from_s3(bucket, object_name):
         print(f"An error occurred: {e}")
         return exit(1)
 
-# upload_to_s3(file_name="utils/files/Gemini-Crime Policy-2023-24.pdf", bucket="ddqbot")
+# upload_to_s3(file_name="utils/files/Gemini-Crime Policy-2023-24.pdf", bucket="<YOUR_BUCKET_NAME>")

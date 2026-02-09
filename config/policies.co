@@ -1,4 +1,3 @@
-# In config/policies.co
 define user ask about policies
   "What is the sick leave policy?"
   "How many vacation days do I get?"
@@ -7,6 +6,8 @@ define user ask about policies
   "Can I work from home?"
   "policy"
   "leave"
+  "IT support"
+  "Help desk"
 
 define bot intent_allowed
   "ALLOWED"
