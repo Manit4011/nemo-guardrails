@@ -43,3 +43,17 @@ prompts:
       Answer "no" if the message is a legitimate question about HR, Policies, or IT.
       
       Answer (yes/no):
+
+  - task: self_check_hallucination
+    content: |
+      You are a fact-checking assistant. Your job is to verify if the statement is supported by the context.
+      
+      Context: "{{ context }}"
+      
+      Statement: "{{ bot_response }}"
+      
+      Does the statement contain information NOT present in the context?
+      Answer "yes" if the statement is unsupported, contradicts the context, or contains outside information (HALLUCINATION).
+      Answer "no" if the statement is largely supported by the context (SAFE).
+      
+      Answer (yes/no):

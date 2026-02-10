@@ -64,3 +64,18 @@ define bot refuse to answer
 
 define bot inform hallucination
   "{\"Answer\": \"I apologize, but I am unable to provide a verified answer based on policy documents.\", \"urls\": []}"
+
+# ---------------------
+# Manual Hallucination Check
+# ---------------------
+define user ask check hallucination
+  "check hallucination"
+
+define flow manual check hallucination
+  user ask check hallucination
+  $is_hallucination = execute self_check_hallucination
+  if $is_hallucination
+    bot inform hallucination
+    stop
+  else
+    bot intent_allowed

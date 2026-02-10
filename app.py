@@ -291,19 +291,77 @@ async def process_query_helper(conv_id, query):
         store_response(conv_id, msg_id, parsed_response)
         return jsonify({'statusCode': 200, 'body': {'response': parsed_response}})
 
-    # Parse and validate the response structure.
+    # 1. Parse the initial LLM response
     try:
         parsed_response = json.loads(response)
+        answer_text = parsed_response.get("Answer", "")
     except json.JSONDecodeError:
         if isinstance(response, str) and response.startswith("Content Restricted:"):
             parsed_response = {"Answer": response[len("Content Restricted:"):].strip(), "urls": []}
+            answer_text = parsed_response["Answer"]
         else:
             try:
                 result = clean_raw_response(client, response)
                 parsed_response = json.loads(result)
+                answer_text = parsed_response.get("Answer", "")
             except json.JSONDecodeError:
                 return error_response(500, "Failed to parse LLM response.", raw_response=response)
+
+    # ---------------------------------------------------------
+    # NEW: Manual Output Rail (Hallucination Check)
+    # ---------------------------------------------------------
+    if similar_docs and answer_text:
+        logger.info("Running output guardrail (Hallucination Check)...")
         
+        # Construct context string from your RAG chunks
+        # specific implementation depends on your similar_docs structure
+        context_text = "\n".join([str(doc.get('text', '')) for doc in similar_docs])
+        
+        # Prepare variables for the guardrail prompt
+        check_options = {
+            "context": context_text,
+            "bot_response": answer_text
+        }
+
+        # Trigger the manual flow defined in disallowed.co
+        check_result = await rails.generate_async(
+            messages=[{
+                "role": "user", 
+                "content": "check hallucination" # Triggers 'user ask check hallucination'
+            }],
+            options=check_options
+        )
+        
+        # Parse the Guardrail decision
+        check_content = check_result.content if hasattr(check_result, 'content') else str(check_result)
+
+        # --- ADD THIS LOGGING ---
+        print(f"\n[TESTING LOG] Context sent: {len(context_text)} chars")
+        print(f"[TESTING LOG] Bot Response: {answer_text[:50]}...")
+        print(f"[TESTING LOG] Guardrail Decision: {check_content}\n")
+        # ------------------------
+        
+        # If the check failed, it returns the JSON from 'bot inform hallucination'
+        if "unable to provide" in check_content or "apologize" in check_content:
+            logger.warning(f"Hallucination detected for query: {query}")
+            try:
+                # Replace the answer with the guardrail refusal
+                parsed_response = json.loads(check_content) 
+            except:
+                parsed_response = {
+                    "Answer": "I apologize, but I am unable to provide a verified answer based on policy documents.",
+                    "urls": []
+                }
+        elif check_content.strip() == "ALLOWED":
+            logger.info("Hallucination check passed.")
+        else:
+            # Fallback: If unexpected output, assume safe or log warning
+            logger.info(f"Guardrail returned unexpected output: {check_content}")
+
+    # ---------------------------------------------------------
+    # End New Code
+    # ---------------------------------------------------------
+
     # Finalize URLs and store the response.
     parsed_response["urls"] = generate_urls(parsed_response.get("Policies", {}))
     store_response(conv_id, msg_id, parsed_response)
